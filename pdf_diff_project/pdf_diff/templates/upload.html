@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF差分比較</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+</head>
+<body>
+    <header>
+        <h1>PDF差分比較ツール</h1>
+        <p class="subtitle">2つのPDFファイルの違いを見つけます</p>
+    </header>
+
+    <div class="container">
+        <div class="upload-container">
+            <div class="dropzone" id="dropzone1">
+                <div class="dropzone-content">
+                    <div class="icon">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M14 2H6C4.89543 2 4 2.89543 4 4V20C4 21.1046 4.89543 22 6 22H18C19.1046 22 20 21.1046 20 20V8L14 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M14 2V8H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M12 18V12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M9 15L12 12L15 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    <div class="text">
+                        <h3>元のファイル</h3>
+                        <p>ファイルをドラッグ＆ドロップ<br>または<br>クリックしてファイルを選択</p>
+                    </div>
+                    <div class="file-info" id="file-info1"></div>
+                </div>
+                <input type="file" class="file-input" id="file-input1" accept=".pdf">
+            </div>
+
+            <div class="dropzone" id="dropzone2">
+                <div class="dropzone-content">
+                    <div class="icon">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M14 2H6C4.89543 2 4 2.89543 4 4V20C4 21.1046 4.89543 22 6 22H18C19.1046 22 20 21.1046 20 20V8L14 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M14 2V8H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M12 18V12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M9 15L12 12L15 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    <div class="text">
+                        <h3>比較するファイル</h3>
+                        <p>ファイルをドラッグ＆ドロップ<br>または<br>クリックしてファイルを選択</p>
+                    </div>
+                    <div class="file-info" id="file-info2"></div>
+                </div>
+                <input type="file" class="file-input" id="file-input2" accept=".pdf">
+            </div>
+        </div>
+
+        <div class="button-container">
+            <button id="compare-button" class="btn btn-primary" disabled>比較開始</button>
+            <div class="progress-container" style="display: none;">
+                <div class="progress-bar">
+                    <div class="progress-fill"></div>
+                </div>
+                <p class="progress-text">処理中...</p>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>© 2025 PDF差分比較ツール</p>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const dropzone1 = document.getElementById('dropzone1');
+            const dropzone2 = document.getElementById('dropzone2');
+            const fileInput1 = document.getElementById('file-input1');
+            const fileInput2 = document.getElementById('file-input2');
+            const fileInfo1 = document.getElementById('file-info1');
+            const fileInfo2 = document.getElementById('file-info2');
+            const compareButton = document.getElementById('compare-button');
+            const progressContainer = document.querySelector('.progress-container');
+            const progressFill = document.querySelector('.progress-fill');
+            
+            let file1 = null;
+            let file2 = null;
+            
+            // CSRFトークンの取得
+            function getCookie(name) {
+                let cookieValue = null;
+                if (document.cookie && document.cookie !== '') {
+                    const cookies = document.cookie.split(';');
+                    for (let i = 0; i < cookies.length; i++) {
+                        const cookie = cookies[i].trim();
+                        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                            break;
+                        }
+                    }
+                }
+                return cookieValue;
+            }
+            const csrftoken = getCookie('csrftoken');
+            
+            // ドラッグオーバーイベントの処理
+            function handleDragOver(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.classList.add('dragover');
+            }
+            
+            // ドラッグリーブイベントの処理
+            function handleDragLeave(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.classList.remove('dragover');
+            }
+            
+            // ドロップイベントの処理
+            function handleDrop(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.classList.remove('dragover');
+                
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                
+                if (files.length > 0) {
+                    const file = files[0];
+                    if (file.type === 'application/pdf') {
+                        if (this === dropzone1) {
+                            file1 = file;
+                            fileInfo1.textContent = `選択されたファイル: ${file.name}`;
+                            fileInfo1.classList.add('file-selected');
+                        } else {
+                            file2 = file;
+                            fileInfo2.textContent = `選択されたファイル: ${file.name}`;
+                            fileInfo2.classList.add('file-selected');
+                        }
+                        checkButtonStatus();
+                    } else {
+                        alert('PDFファイルのみアップロードできます。');
+                    }
+                }
+            }
+            
+            // ファイル入力の変更イベントの処理
+            function handleFileInputChange(e) {
+                const file = e.target.files[0];
+                if (file && file.type === 'application/pdf') {
+                    if (this === fileInput1) {
+                        file1 = file;
+                        fileInfo1.textContent = `選択されたファイル: ${file.name}`;
+                        fileInfo1.classList.add('file-selected');
+                    } else {
+                        file2 = file;
+                        fileInfo2.textContent = `選択されたファイル: ${file.name}`;
+                        fileInfo2.classList.add('file-selected');
+                    }
+                    checkButtonStatus();
+                } else {
+                    alert('PDFファイルのみアップロードできます。');
+                }
+            }
+            
+            // ボタンの状態を確認
+            function checkButtonStatus() {
+                if (file1 && file2) {
+                    compareButton.disabled = false;
+                } else {
+                    compareButton.disabled = true;
+                }
+            }
+            
+            // 比較ボタンのクリックイベント
+            compareButton.addEventListener('click', function() {
+                if (!file1 || !file2) {
+                    alert('両方のファイルをアップロードしてください。');
+                    return;
+                }
+                
+                // フォームデータの作成
+                const formData = new FormData();
+                formData.append('file1', file1);
+                formData.append('file2', file2);
+                
+                // 進捗表示の開始
+                compareButton.style.display = 'none';
+                progressContainer.style.display = 'block';
+                
+                // 擬似的な進捗を表示
+                let progress = 0;
+                const interval = setInterval(() => {
+                    progress += 1;
+                    progressFill.style.width = `${Math.min(progress, 95)}%`;
+                    if (progress >= 95) clearInterval(interval);
+                }, 50);
+                
+                // ファイルの送信
+                fetch('/process/', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': csrftoken
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // 進捗を100%に設定
+                        clearInterval(interval);
+                        progressFill.style.width = '100%';
+                        
+                        // 結果ページへリダイレクト
+                        setTimeout(() => {
+                            window.location.href = '/result/';
+                        }, 500);
+                    } else {
+                        alert('エラーが発生しました: ' + data.error);
+                        compareButton.style.display = 'block';
+                        progressContainer.style.display = 'none';
+                    }
+                })
+                .catch(error => {
+                    alert('エラーが発生しました: ' + error);
+                    compareButton.style.display = 'block';
+                    progressContainer.style.display = 'none';
+                });
+            });
+            
+            // ドロップゾーンのクリックイベント
+            dropzone1.addEventListener('click', function() {
+                fileInput1.click();
+            });
+            
+            dropzone2.addEventListener('click', function() {
+                fileInput2.click();
+            });
+            
+            // イベントリスナーの追加
+            dropzone1.addEventListener('dragover', handleDragOver);
+            dropzone1.addEventListener('dragleave', handleDragLeave);
+            dropzone1.addEventListener('drop', handleDrop);
+            fileInput1.addEventListener('change', handleFileInputChange);
+            
+            dropzone2.addEventListener('dragover', handleDragOver);
+            dropzone2.addEventListener('dragleave', handleDragLeave);
+            dropzone2.addEventListener('drop', handleDrop);
+            fileInput2.addEventListener('change', handleFileInputChange);
+        });
+    </script>
+</body>
+</html>
