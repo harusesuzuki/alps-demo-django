@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF差分比較結果</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+</head>
+<body>
+    <header>
+        <h1>PDF差分比較結果</h1>
+        <p class="subtitle">変更箇所を色分けして表示しています</p>
+    </header>
+
+    <div class="container result-container">
+        <div class="file-headers">
+            <div class="file-header">{{ file1_name }}</div>
+            <div class="file-header">{{ file2_name }}</div>
+        </div>
+        
+        <div class="legend">
+            <div class="legend-item">
+                <span class="legend-color deleted"></span>
+                <span class="legend-text">削除されたテキスト</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color added"></span>
+                <span class="legend-text">追加されたテキスト</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color modified"></span>
+                <span class="legend-text">変更されたテキスト</span>
+            </div>
+        </div>
+
+        <div class="diff-container">
+            <div class="diff-panel left-panel">
+                {% for item in diff_result %}
+                    {% if item.type == 'unchanged' %}
+                        <div class="diff-line unchanged">{{ item.line }}</div>
+                    {% elif item.type == 'deleted' %}
+                        <div class="diff-line deleted">{{ item.line }}</div>
+                    {% elif item.type == 'added' %}
+                        <div class="diff-line empty">&nbsp;</div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            <div class="diff-panel right-panel">
+                {% for item in diff_result %}
+                    {% if item.type == 'unchanged' %}
+                        <div class="diff-line unchanged">{{ item.line_orig }}</div>
+                    {% elif item.type == 'deleted' %}
+                        <div class="diff-line empty">&nbsp;</div>
+                    {% elif item.type == 'added' %}
+                        <div class="diff-line added">{{ item.line_orig }}</div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="button-container">
+            <a href="/" class="btn btn-secondary">別のファイルを比較</a>
+            <button id="toggleDiffView" class="btn btn-primary">表示モード切替</button>
+            <button id="exportPDF" class="btn btn-success">PDF出力</button>
+        </div>
+    </div>
+
+    <footer>
+        <p>© 2025 PDF差分比較ツール</p>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const toggleButton = document.getElementById('toggleDiffView');
+            const diffContainer = document.querySelector('.diff-container');
+            const exportButton = document.getElementById('exportPDF');
+            
+            // 表示モードの切り替え
+            toggleButton.addEventListener('click', function() {
+                diffContainer.classList.toggle('unified-view');
+                if (diffContainer.classList.contains('unified-view')) {
+                    toggleButton.textContent = '分割表示に戻す';
+                } else {
+                    toggleButton.textContent = '統合表示に切替';
+                }
+            });
+            
+            // PDF出力ボタン（擬似的な機能）
+            exportButton.addEventListener('click', function() {
+                alert('この機能は実装中です。現在は比較結果を表示するのみです。');
+            });
+            
+            // 行番号の追加
+            function addLineNumbers() {
+                const leftPanel = document.querySelector('.left-panel');
+                const rightPanel = document.querySelector('.right-panel');
+                
+                const leftLines = leftPanel.querySelectorAll('.diff-line');
+                const rightLines = rightPanel.querySelectorAll('.diff-line');
+                
+                leftLines.forEach((line, index) => {
+                    line.setAttribute('data-line-number', index + 1);
+                });
+                
+                rightLines.forEach((line, index) => {
+                    line.setAttribute('data-line-number', index + 1);
+                });
+            }
+            
+            // 行のハイライト処理
+            function setupLineHighlighting() {
+                const diffLines = document.querySelectorAll('.diff-line');
+                
+                diffLines.forEach(line => {
+                    line.addEventListener('mouseover', function() {
+                        const lineNumber = this.getAttribute('data-line-number');
+                        const correspondingLines = document.querySelectorAll(`.diff-line[data-line-number="${lineNumber}"]`);
+                        correspondingLines.forEach(l => l.classList.add('highlight'));
+                    });
+                    
+                    line.addEventListener('mouseout', function() {
+                        const lineNumber = this.getAttribute('data-line-number');
+                        const correspondingLines = document.querySelectorAll(`.diff-line[data-line-number="${lineNumber}"]`);
+                        correspondingLines.forEach(l => l.classList.remove('highlight'));
+                    });
+                });
+            }
+            
+            // スクロール同期
+            function syncScroll() {
+                const leftPanel = document.querySelector('.left-panel');
+                const rightPanel = document.querySelector('.right-panel');
+                
+                leftPanel.addEventListener('scroll', function() {
+                    rightPanel.scrollTop = leftPanel.scrollTop;
+                });
+                
+                rightPanel.addEventListener('scroll', function() {
+                    leftPanel.scrollTop = rightPanel.scrollTop;
+                });
+            }
+            
+            // 初期化処理の実行
+            addLineNumbers();
+            setupLineHighlighting();
+            syncScroll();
+        });
+    </script>
+</body>
+</html>
